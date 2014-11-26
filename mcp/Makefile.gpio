@@ -1,0 +1,60 @@
+## sources
+SRCS_MCP = main.c
+SRCS_UNIVERSAL = error.c file.c program.c hex.c gpio.c spi.c nRF24L01+.c task.c task_program.c  task_nRF24.c task_flash.c
+SRCS = $(SRCS_MCP)
+
+## objects
+OBJS_MCP = $(SRCS_MCP:.c=.o)
+OBJS_UNIVERSAL = $(SRCS_UNIVERSAL:.c=.o)
+OBJS = $(SRCS:.c=.o)
+
+## output
+BINS = mcp
+
+INCLUDE = -I /opt/local/include -I /opt/local/include/libusb-1.0
+DEFINES = -DUSE_FTDI
+CFLAGS = -g -Wall -std=gnu99 -ffunction-sections -fpack-struct $(INCLUDE) $(DEFINES)
+LIB = -L /opt/local/lib -lftdi
+CC = gcc $(CFLAGS)
+
+all: $(BINS) 
+
+.c.o: Makefile
+	$(CC) -c $< -o $@
+
+Makefile.depend:
+	touch Makefile.depend
+
+depend: Makefile.depend
+	makedepend -fMakefile.depend -- $(CFLAGS) -- $(SRCS)
+
+clean: depend
+	rm -f $(ELFS) $(BINS) $(OBJS) $(OBJS_UNIVERSAL)
+
+mcp: $(OBJS_MCP) $(OBJS_UNIVERSAL)
+	$(CC) -o $@ $(OBJS_MCP) $(OBJS_UNIVERSAL) -lm $(LIB)
+
+test: $(BINS)
+	sudo ./mcp gpio test 23 65535 5000
+	sudo ./mcp nRF24 print
+	sudo ./mcp nRF24 scanner 16
+	sudo ./mcp nRF24 ping 8
+	./mcp program parse test.prg
+	sudo ./mcp program reset
+	sudo ./mcp program stop
+	sudo ./mcp program rgb 0 0 0
+	sudo ./mcp program start
+	./mcp program rainbow rainbow.prg
+	sudo ./mcp program upload rainbow.prg
+	sudo ./mcp program download download.prg
+	sudo ./mcp program lightfreq
+	sudo ./mcp program reset; sleep 2; sudo ./mcp program stop; sudo ./mcp program rgb 0 0 0;
+	./mcp flash hex ../../blink/blink.hex /tmp/blink.hex
+	diff -w ../../blink/blink.hex /tmp/blink.hex
+	sudo ./mcp flash test 1e 95 f
+	sudo ./mcp flash download 1e 95 f flash.hex
+	sudo ./mcp flash upload 1e 95 f ../blink/blink.hex
+	sudo ./mcp flash eeprom download 1e 95 f /tmp/eeprom.hex
+	sudo ./mcp flash eeprom upload 1e 95 f /tmp/eeprom.hex
+
+include Makefile.depend
